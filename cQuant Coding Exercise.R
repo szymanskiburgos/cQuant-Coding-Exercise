@@ -9,12 +9,6 @@ library(Compind)
 library(scales) 
 library(gridExtra)
 library(foreign)
-
-library(stargazer)
-library(sandwich)
-library(AER)
-library(plm)
-
 # Load Data ====================================================================
 workingfilepath <- file.choose()
 data <- read.csv(workingfilepath)
@@ -24,6 +18,4 @@ new_directory <- "/cQuant"
 dir.create(new_directory)
 
 # Programming Exercise Tasks ===================================================
-
-
 write.csv(data, file = 'Output/test.csv', row.names = FALSE)
