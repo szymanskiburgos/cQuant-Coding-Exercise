@@ -82,7 +82,7 @@ write.csv(df_wide, file = sprintf('Output/formattedSpotHistory/spot_%s.csv',sett
 # Bonus 1 generate two line plots for monthly avg prices in chron.order ========
 avg_settlement_price$Date <- as.Date(paste(avg_settlement_price$Year, avg_settlement_price$Month, "01", sep = "-")) #recombine month/year into datetime
 
-#first plot:monthly average prices for settlement hubs only
+# 1st plot: monthly average prices for settlement hubs only
 HB_avgs <- avg_settlement_price %>% 
   filter(startsWith(SettlementPoint, 'HB_'))
 
@@ -91,7 +91,7 @@ ggplot(HB_avgs, aes(x = Date, y = AveragePrice, color = SettlementPoint)) +
   labs(title = "Monthly Avg Prices For Settlement Hubs", x = "Date", y = "AveragePrice", color = "SettlementPoint")
 ggsave(file.path("Output/SettlementHubAveragePriceByMonth.png"))
 
-#second plot: monthly average prices for load zones only
+# 2nd plot: monthly average prices for load zones only
 LZ_avgs <- avg_settlement_price %>% 
   filter(startsWith(SettlementPoint, 'LZ_'))
 
@@ -118,7 +118,6 @@ if (!file.exists(folder_path)) {
 }
 
 to_append$DayOfWeek <- day(to_append$Date) # extract dayoftheweek from Date column
-
 normalized_shape_profiles <- to_append %>%
   group_by(SettlementPoint, Year, Month, DayOfWeek) %>% # groupby SettlementPoint, Year, Month, and Day 
   summarize(NormalizedPrice = Price / mean(Price, na.rm = TRUE)) # get 24 normalized prices by settlement-year-month-day 
@@ -129,5 +128,61 @@ for (settlement in settlement_names) {
 }
 
 # Bonus 4 open-ended analysis ==================================================
+to_append$Hour <- hour(to_append$Date) + 1 # extract hour data
+folder_path <- 'Output/OutputforOpenEndedAnalysis' #save files in "hourlyShapeProfiles"subdirectory within main output directory
+if (!file.exists(folder_path)) { 
+  dir.create(folder_path)
+  print(paste("Folder", folder_path, "created."))
+} else {
+  print(paste("Folder", folder_path, "already exists."))
+}
 
+# seasonality of energy prices
+avg_settlement_price_by_month <- to_append %>%
+  group_by(SettlementPoint,  Month) %>%
+  summarize(AveragePrice = mean(Price)) # overall monthly average 
+
+avg_settlement_price_by_day <- to_append %>%
+  group_by(SettlementPoint,  DayOfWeek) %>%
+  summarize(AveragePrice = mean(Price)) # overall daily average 
+
+avg_settlement_price_by_hour <- to_append %>%
+  group_by(SettlementPoint,  Hour) %>%
+  summarize(AveragePrice = mean(Price)) # overall hourly average 
+
+ggplot(avg_settlement_price_by_month, aes(x = Month, y = AveragePrice, color = SettlementPoint)) +
+  geom_line() + geom_point() +
+  labs(title = "Overall Avg Price By Month", x = "Month", y = "AveragePrice", color = "SettlementPoint") +
+  scale_x_continuous(breaks = unique(avg_settlement_price_by_month$Month))
+ggsave(file.path("Output/OutputforOpenEndedAnalysis/OverallMonthlyAvgPrice.png"))
+
+ggplot(avg_settlement_price_by_day, aes(x = DayOfWeek, y = AveragePrice, color = SettlementPoint)) +
+  geom_line() + geom_point() +
+  labs(title = "Overall Avg Price By Day", x = "DayOfWeek", y = "AveragePrice", color = "SettlementPoint") +
+  scale_x_continuous(breaks = unique(avg_settlement_price_by_day$DayOfWeek))
+ggsave(file.path("Output/OutputforOpenEndedAnalysis/OverallDailyAvgPrice.png"))
+
+ggplot(avg_settlement_price_by_hour, aes(x = Hour, y = AveragePrice, color = SettlementPoint)) +
+  geom_line() + geom_point() +
+  labs(title = "Overall Avg Price By Hour", x = "Hour", y = "AveragePrice", color = "SettlementPoint") +
+  scale_x_continuous(breaks = unique(avg_settlement_price_by_hour$Hour))
+ggsave(file.path("Output/OutputforOpenEndedAnalysis/OverallHourlyAvgPrice.png"))
+
+# we can observe cyclic patterns in the spot-price data at multiple levels: months in a year, days in a month, and hours in a day
+
+# months: avg energy prices across SettlementPoints are highest in the Summer months, peaking in August.
+# high energy prices in the late Summer likely reflect the fact that the hottest months of the year for the US are July and August
+# which is when demand for electricity will be highest as residents and commercial establishments are relying on air conditioning to stay cool
+# we would have expected energy prices to show peaks also at the height on winter when energy demand is high for heating
+# given this result, I would investigate whether the data are excluding fuels in the calculation of energy prices 
+# such as natural gas, propane, etc. in other words, the prices may be reflecting just electricity prices
+
+# days: avg energy prices appear to exhibit a cyclic trend in the week whereby energy prices tend higher toward the end of the week
+# we can reasonably expect energy demand to rise around weekends when people tend to stay up later and thus use more
+# electricity throughout the night. additionally, factors like increased rates of social events, longer hours for establishments, etc. 
+# will affect weekend energy demand
+
+# hours: within the day, avg energy prices are highest in the late afternoon/early nighttime when energy demand will peak
+# as residents and commercial establishments use lighting that was not necessary during the day
+# however, as we go further into the night, energy demand dips back down to reflect that residents are going to sleep and establishments are closing
 
