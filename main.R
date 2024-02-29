@@ -178,4 +178,3 @@ ggsave(file.path("Output/OutputforOpenEndedAnalysis/OverallHourlyAvgPrice.png"))
 # hours: within the day, avg energy prices are highest in the late afternoon/early nighttime when energy demand will peak
 # as residents and commercial establishments use lighting that was not necessary during the day
 # however, as we go further into the night, energy demand dips back down to reflect that residents are going to sleep and establishments are closing
-
