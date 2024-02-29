@@ -191,8 +191,8 @@ SpotPriceData <- SpotPriceData %>%
 spot_ts <- ts(SpotPriceData$Price, frequency = 24)  
 
 train_size <- 0.8  # Split the time series into training and testing sets
-train_length <- round(length(spot_ts) * train_size) 
-train_ts <- window(spot_ts, end = train_length)
+train_length <- round(length(spot_ts) * train_size)
+train_ts <- window(spot_ts, start = 1, end = train_length)
 test_ts <- window(spot_ts, start = train_length + 1)
 
 arima_model <- auto.arima(train_ts)
