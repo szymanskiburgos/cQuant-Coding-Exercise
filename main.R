@@ -10,18 +10,18 @@ library(foreign)
 library(ggplot2)
 
 # Task 1 Load Data and Combine =================================================
-to_append <- read.csv('historicalPriceData/ERCOT_DA_Prices_2016.csv')
+SpotPriceData <- read.csv('historicalPriceData/ERCOT_DA_Prices_2016.csv')
 for (year in list("2017", "2018", "2019")) {
 filePath <- paste("historicalPriceData/ERCOT_DA_Prices_", year, ".csv", sep = "")
-data <- read.csv(filePath)
-to_append <- rbind(to_append, data) # append 2017-2019 data to the 2016 dataset into one dataframe
+append_data <- read.csv(filePath)
+SpotPriceData <- rbind(SpotPriceData, append_data) # append 2017-2019 data to the 2016 dataset into one dataframe
 }
 
 # Task 2 Compute avg price for each settlement point and year-month ============
-to_append$Year <- year(to_append$Date) # extract year from Date column
-to_append$Month <- month(to_append$Date) # extract month from Data column
+SpotPriceData$Year <- year(SpotPriceData$Date) # extract year from Date column
+SpotPriceData$Month <- month(SpotPriceData$Date) # extract month from Data column
 
-avg_settlement_price <- to_append %>%
+avg_settlement_price <- SpotPriceData %>%
   group_by(SettlementPoint, Year, Month) %>%
   summarize(AveragePrice = mean(Price)) # groupby mean price of SettlementPoint and Year-Month
 
@@ -29,7 +29,7 @@ avg_settlement_price <- to_append %>%
 write.csv(avg_settlement_price, file = 'Output/AveragePriceByMonth.csv', row.names = FALSE)
 
 # Task 4 Compute hourly price volatility for year and settlement hub ===========
-filtered_data <- to_append %>% 
+filtered_data <- SpotPriceData %>% 
   filter(startsWith(SettlementPoint, "HB_")) %>% # retain only 'HB_' settlement points
   filter(Price > 0) # retain only positive, non-zero prices
 
@@ -61,9 +61,9 @@ if (!file.exists(folder_path)) {
   print(paste("Folder", folder_path, "already exists."))
 }
 
-settlement_names <- unique(to_append$SettlementPoint) # get list of all settlement names
+settlement_names <- unique(SpotPriceData$SettlementPoint) # get list of all settlement names
 for (settlement in settlement_names) {
-df <- subset(to_append, SettlementPoint == settlement)
+df <- subset(SpotPriceData, SettlementPoint == settlement)
 df$Hour <- hour(df$Date) + 1 # extract hour data
 df$Hour <- paste0('X', df$Hour) # add 'X' prefix
 df$Date <- as.Date(df$Date) # remove hour component from 'Date'
@@ -110,8 +110,8 @@ if (!file.exists(folder_path)) {
   print(paste("Folder", folder_path, "already exists."))
 }
 
-to_append$DayOfWeek <- day(to_append$Date) # extract dayoftheweek from Date column
-normalized_shape_profiles <- to_append %>%
+SpotPriceData$DayOfWeek <- day(SpotPriceData$Date) # extract dayoftheweek from Date column
+normalized_shape_profiles <- SpotPriceData %>%
   group_by(SettlementPoint, Year, Month, DayOfWeek) %>% # groupby SettlementPoint, Year, Month, and Day 
   summarize(NormalizedPrice = Price / mean(Price, na.rm = TRUE)) # get 24 normalized prices by settlement-year-month-day 
 
@@ -121,7 +121,7 @@ for (settlement in settlement_names) {
 }
 
 # Bonus 4 open-ended analysis ==================================================
-to_append$Hour <- hour(to_append$Date) + 1 # extract hour data
+SpotPriceData$Hour <- hour(SpotPriceData$Date) + 1 # extract hour data
 folder_path <- 'Output/OutputforOpenEndedAnalysis' #save files in "hourlyShapeProfiles"subdirectory within main output directory
 if (!file.exists(folder_path)) { 
   dir.create(folder_path)
@@ -131,15 +131,15 @@ if (!file.exists(folder_path)) {
 }
 
 # seasonality of energy prices
-avg_settlement_price_by_month <- to_append %>%
+avg_settlement_price_by_month <- SpotPriceData %>%
   group_by(SettlementPoint,  Month) %>%
   summarize(AveragePrice = mean(Price)) # overall monthly average 
 
-avg_settlement_price_by_day <- to_append %>%
+avg_settlement_price_by_day <- SpotPriceData %>%
   group_by(SettlementPoint,  DayOfWeek) %>%
   summarize(AveragePrice = mean(Price)) # overall daily average 
 
-avg_settlement_price_by_hour <- to_append %>%
+avg_settlement_price_by_hour <- SpotPriceData %>%
   group_by(SettlementPoint,  Hour) %>%
   summarize(AveragePrice = mean(Price)) # overall hourly average 
 
