@@ -5,16 +5,9 @@
 
 # Packages =====================================================================
 library(tidyverse)
-library(factoextra)
-library(Compind)
-library(scales) 
 library(lubridate)
 library(foreign)
 library(ggplot2)
-
-# Set directory ================================================================
-# new_directory <- "/cQuant"
-# dir.create(new_directory)
 
 # Task 1 Load Data and Combine =================================================
 to_append <- read.csv('historicalPriceData/ERCOT_DA_Prices_2016.csv')
