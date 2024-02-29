@@ -8,6 +8,7 @@ library(tidyverse)
 library(lubridate)
 library(foreign)
 library(ggplot2)
+library(forecast)
 
 # Task 1 Load Data and Combine =================================================
 SpotPriceData <- read.csv('historicalPriceData/ERCOT_DA_Prices_2016.csv')
@@ -130,7 +131,7 @@ if (!file.exists(folder_path)) {
   print(paste("Folder", folder_path, "already exists."))
 }
 
-# seasonality of energy prices
+# Cyclical trends in energy prices
 avg_settlement_price_by_month <- SpotPriceData %>%
   group_by(SettlementPoint,  Month) %>%
   summarize(AveragePrice = mean(Price)) # overall monthly average 
@@ -178,3 +179,22 @@ ggsave(file.path("Output/OutputforOpenEndedAnalysis/OverallHourlyAvgPrice.png"))
 # hours: within the day, avg energy prices are highest in the late afternoon/early nighttime when energy demand will peak
 # as residents and commercial establishments use lighting that was not necessary during the day
 # however, as we go further into the night, energy demand dips back down to reflect that residents are going to sleep and establishments are closing
+
+
+### ARCHIVE ###
+
+# temporal-based forecasts
+# ran out of time to complete this last analysis, but here is how I would start it
+SpotPriceData <- SpotPriceData %>%
+  select(Date, Price) %>%
+  mutate(Date = as.POSIXct(Date)) #Set 'Date' as the time index
+spot_ts <- ts(SpotPriceData$Price, frequency = 24)  
+
+train_size <- 0.8  # Split the time series into training and testing sets
+train_length <- round(length(spot_ts) * train_size) 
+train_ts <- window(spot_ts, end = train_length)
+test_ts <- window(spot_ts, start = train_length + 1)
+
+arima_model <- auto.arima(train_ts)
+summary(arima_model)
+forecast_values <- forecast(arima_model, h = length(test_ts))
