@@ -1,6 +1,7 @@
 # cQuant Coding Exercise
 # Adam Szymanski-Burgos
 # Created: 02/29/2024
+# 4-hour window: 11:00am - 3:00pm MST
 
 # Packages =====================================================================
 library(tidyverse)
@@ -35,9 +36,8 @@ avg_settlement_price <- to_append %>%
 write.csv(avg_settlement_price, file = 'Output/AveragePriceByMonth.csv', row.names = FALSE)
 
 # Task 4 Compute hourly price volatility for year and settlement hub ===========
-prefix <- "HB_"
 filtered_data <- to_append %>% 
-  filter(startsWith(SettlementPoint, prefix)) %>% # retain only 'HB_' settlement points
+  filter(startsWith(SettlementPoint, "HB_")) %>% # retain only 'HB_' settlement points
   filter(Price > 0) # retain only positive, non-zero prices
 
 filtered_data <- filtered_data %>%
@@ -117,5 +117,17 @@ if (!file.exists(folder_path)) {
   print(paste("Folder", folder_path, "already exists."))
 }
 
+to_append$DayOfWeek <- day(to_append$Date) # extract dayoftheweek from Date column
 
-ssss 
+normalized_shape_profiles <- to_append %>%
+  group_by(SettlementPoint, Year, Month, DayOfWeek) %>% # groupby SettlementPoint, Year, Month, and Day 
+  summarize(NormalizedPrice = Price / mean(Price, na.rm = TRUE)) # get 24 normalized prices by settlement-year-month-day 
+
+for (settlement in settlement_names) {
+  normalized_shape_profile_by_settlement <- subset(normalized_shape_profiles, SettlementPoint == settlement)
+  write.csv(normalized_shape_profile_by_settlement, file = sprintf('Output/hourlyShapeProfiles/profile_%s.csv',settlement), row.names = FALSE)
+}
+
+# Bonus 4 open-ended analysis ==================================================
+
+
