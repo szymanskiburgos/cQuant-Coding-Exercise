@@ -7,15 +7,114 @@ library(tidyverse)
 library(factoextra)
 library(Compind)
 library(scales) 
-library(gridExtra)
+library(lubridate)
 library(foreign)
-# Load Data ====================================================================
-workingfilepath <- file.choose()
-data <- read.csv(workingfilepath)
+library(ggplot2)
 
-# Create empty directory =======================================================
-new_directory <- "/cQuant"
-dir.create(new_directory)
+# Set directory ================================================================
+# new_directory <- "/cQuant"
+# dir.create(new_directory)
 
-# Programming Exercise Tasks ===================================================
-write.csv(data, file = 'Output/test.csv', row.names = FALSE)
+# Task 1 Load Data and Combine =================================================
+to_append <- read.csv('historicalPriceData/ERCOT_DA_Prices_2016.csv')
+for (year in list("2017", "2018", "2019")) {
+filePath <- paste("historicalPriceData/ERCOT_DA_Prices_", year, ".csv", sep = "")
+data <- read.csv(filePath)
+to_append <- rbind(to_append, data) # append 2017-2019 data to the 2016 dataset into one dataframe
+}
+
+# Task 2 Compute avg price for each settlement point and year-month ============
+to_append$Year <- year(to_append$Date) # extract year from Date column
+to_append$Month <- month(to_append$Date) # extract month from Data column
+
+avg_settlement_price <- to_append %>%
+  group_by(SettlementPoint, Year, Month) %>%
+  summarize(AveragePrice = mean(Price)) # groupby mean price of SettlementPoint and Year-Month
+
+# Task 3 Write monthly average prices to csv ===================================
+write.csv(avg_settlement_price, file = 'Output/AveragePriceByMonth.csv', row.names = FALSE)
+
+# Task 4 Compute hourly price volatility for year and settlement hub ===========
+prefix <- "HB_"
+filtered_data <- to_append %>% 
+  filter(startsWith(SettlementPoint, prefix)) %>% # retain only 'HB_' settlement points
+  filter(Price > 0) # retain only positive, non-zero prices
+
+filtered_data <- filtered_data %>%
+  group_by(SettlementPoint, Year) %>%
+  mutate(log_returns = c(0, diff(log(Price)))) # calculate log returns by settlement-year
+
+std_dev_log_returns <- filtered_data %>%
+  group_by(SettlementPoint, Year) %>%
+  summarize(HourlyVolatility = sd(log_returns, na.rm = TRUE)) # compute std_dev by settlement-year
+
+# Task 5 Write computed hourly volatilities to csv =============================
+write.csv(std_dev_log_returns, file = 'Output/HourlyVolatilityByYear.csv', row.names = FALSE)
+
+# Task 6 which hub-year showed the highest overall hourly volatility ===========
+yearly_max <- tapply(std_dev_log_returns$HourlyVolatility, std_dev_log_returns$Year, max) # compute yearly max-values
+yearly_max <- data.frame(Year = as.integer(names(yearly_max)), Max_Value = yearly_max) # take to dataframe
+top_volatility_hubs <- merge(yearly_max, std_dev_log_returns, by.x = "Max_Value", by.y = "HourlyVolatility", all = FALSE) %>% # merge settlement names
+  select(SettlementPoint, Year.x, Max_Value) %>%
+  rename(Year = Year.x, HourlyVolatility = Max_Value)
+write.csv(top_volatility_hubs, file = 'Output/MaxVolatilityByYear.csv', row.names = FALSE)
+
+# Task 7 prep power price data structure for price simulation models ===========
+folder_path <- 'Output/formattedSpotHistory' #save files in "formattedSpotHistory"subdirectory within main output directory
+if (!file.exists(folder_path)) { 
+  dir.create(folder_path)
+  print(paste("Folder", folder_path, "created."))
+} else {
+  print(paste("Folder", folder_path, "already exists."))
+}
+
+settlement_names <- unique(to_append$SettlementPoint) # get list of all settlement names
+for (settlement in settlement_names) {
+df <- subset(to_append, SettlementPoint == settlement)
+df$Hour <- hour(df$Date) + 1 # extract hour data
+df$Hour <- paste0('X', df$Hour) # add 'X' prefix
+df$Date <- as.Date(df$Date) # remove hour component from 'Date'
+df_wide <- pivot_wider(df, names_from = Hour, values_from = Price) # pivot from long to wide
+df_wide <- subset(df_wide, select = -c(SettlementPoint, Year, Month))
+write.csv(df_wide, file = sprintf('Output/formattedSpotHistory/spot_%s.csv',settlement), row.names = FALSE)
+}
+
+# Bonus 1 generate two line plots for monthly avg prices in chron.order ========
+avg_settlement_price$Date <- as.Date(paste(avg_settlement_price$Year, avg_settlement_price$Month, "01", sep = "-")) #recombine month/year into datetime
+
+#first plot:monthly average prices for settlement hubs only
+HB_avgs <- avg_settlement_price %>% 
+  filter(startsWith(SettlementPoint, 'HB_'))
+
+ggplot(HB_avgs, aes(x = Date, y = AveragePrice, color = SettlementPoint)) +
+  geom_line() + geom_point() +
+  labs(title = "Monthly Avg Prices For Settlement Hubs", x = "Date", y = "AveragePrice", color = "SettlementPoint")
+ggsave(file.path("Output/SettlementHubAveragePriceByMonth.png"))
+
+#second plot: monthly average prices for load zones only
+LZ_avgs <- avg_settlement_price %>% 
+  filter(startsWith(SettlementPoint, 'LZ_'))
+
+ggplot(LZ_avgs, aes(x = Date, y = AveragePrice, color = SettlementPoint)) +
+  geom_line() + geom_point() +
+  labs(title = "Monthly Avg Prices For Load Zones", x = "Date", y = "AveragePrice", color = "SettlementPoint")
+ggsave(file.path("Output/LoadZoneAveragePriceByMonth.png"))
+
+
+# Bonus 2 generate plot comparing volatility across settlement hubs by year ====
+ggplot(std_dev_log_returns, aes(x = Year, y = HourlyVolatility, color = SettlementPoint)) +
+  geom_line() + geom_point() +
+  labs(title = "Avg. Hourly Volatility For Settlement Hubs by Year", x = "Year", y = "Avg. HourlyVolatility", color = "SettlementPoint")
+ggsave(file.path("Output/SettlementHubHourlyVolatilityByYear.png"))
+
+
+# Bonus 3 hourly shape profile computation =====================================
+folder_path <- 'Output/hourlyShapeProfiles' #save files in "hourlyShapeProfiles"subdirectory within main output directory
+if (!file.exists(folder_path)) { 
+  dir.create(folder_path)
+  print(paste("Folder", folder_path, "created."))
+} else {
+  print(paste("Folder", folder_path, "already exists."))
+}
+
+
